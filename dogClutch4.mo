@@ -84,7 +84,7 @@ equation
  else
      0;
 
-  fForkDrive = sign(sFork) * abs(tauDogTrans) / rDogRing * sin(aDogLockAngle) / cos(aDogLockAngle);
+  
 
 
   // Torque transfer
@@ -99,6 +99,8 @@ equation
      Sliding;
 
   // Reaction force on the fork
+  // Meshing force due to dog angle and drive torque (axial force)
+  fForkDrive = sign(sFork) * abs(tauDogTrans) / rDogRing * sin(aDogLockAngle) / cos(aDogLockAngle);
   if iDogState == Sliding then
       // Dog to dog fork contact force (axial force)
       fFork = if sFork > +sDogGap then max((sFork - sDogGap) * cForkStop + der(sFork) * dForkStop, 0)
@@ -107,7 +109,7 @@ equation
              else
                  0;
   elseif iDogState == Engaged then
-      // Dog engaged + meshing force due to dog angle and drive torque (axial force)
+      // Dog maximum throw contact force (axial force)
       fFork = if sFork > +sDogThrow then max((sFork - sDogThrow) * cForkStop + der(sFork) * dForkStop, 0)
              else
                  if sFork < -sDogThrow then min((sFork + sDogThrow) * cForkStop + der(sFork) * dForkStop, 0)
