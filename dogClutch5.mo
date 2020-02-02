@@ -16,7 +16,6 @@ final constant Integer Open = 2;
 parameter Integer nDogs = 5;
 
 parameter SI.Angle aDogWindow = 15 * pi / 180;
-
 parameter SI.Angle aDogLockAngle = 1 * pi / 180;
 
 parameter Real cDogTrans = 1000;
@@ -44,9 +43,7 @@ SI.Force fForkDrive;
 SI.Position sFork;
 SI.Force fFork;
 
-// Internal variables
 Integer iDogState;
-Boolean bEngaged;
 
 Real rGear; // = 1.0;
 
@@ -56,9 +53,6 @@ protected
   final constant Real pi = 2 * Modelica.Math.asin(1.0);
 
 equation
-  // Set a boolean whether the dog is engaged
-  bEngaged = iDogState == Engaged;
-
   when iDogState == Engaged then
     // If the dog engages reset the angle
     aDogOffset = floor((input_shaft.phi - rGear * output_shaft.phi) / aDogRep) * aDogRep;
@@ -75,7 +69,7 @@ equation
   aDogMod = noEvent(mod(input_shaft.phi - rGear * output_shaft.phi, aDogRep) - aDogRep / 2);
 
   // Calculate dog clutch torque transfer (tangential force)
-  tauDogTrans = noEvent(if not pre(bEngaged) then 0 else
+  tauDogTrans = noEvent(if not pre(iDogState) == Engaged then 0 else
      if aDog > +aDogHalfWindow then max((aDog - aDogHalfWindow) * cDogTrans + vDog * dDogTrans, 0) else
      if aDog < -aDogHalfWindow then min((aDog + aDogHalfWindow) * cDogTrans + vDog * dDogTrans, 0) else
      0);
@@ -85,33 +79,34 @@ equation
   output_shaft.tau = -tauDogTrans;
 
   // State machine
-  iDogState = if abs(fork.s) < sDogGap then Open
-  else
-     if pre(bEngaged) or abs(aDogMod) < aDogHalfWindow then Engaged
+  iDogState = if abs(fork.s) < sDogGap then Open else
+  if pre(iDogState) == Engaged or abs(aDogMod) < aDogHalfWindow then Engaged
   else Sliding;
 
   // Reaction force on the fork
   if iDogState == Sliding then
-      fForkDrive = 0;
       // Dog to dog fork contact force (axial force)
+      fForkDrive = 0;
       fFork = noEvent(if sFork > +sDogGap then max((sFork - sDogGap) * cForkStop + der(sFork) * dForkStop, 0)
              else
                  if sFork < -sDogGap then min((sFork + sDogGap) * cForkStop + der(sFork) * dForkStop, 0)
              else
                  0);
   elseif iDogState == Engaged then
-      fForkDrive = noEvent(sign(sFork) * abs(tauDogTrans) / rDogRing * sin(aDogLockAngle) / cos(aDogLockAngle));
       // Dog engaged + meshing force due to dog angle and drive torque (axial force)
+      fForkDrive = noEvent(sign(sFork) * abs(tauDogTrans) / rDogRing * sin(aDogLockAngle) / cos(aDogLockAngle));
       fFork = noEvent(if sFork > +sDogThrow then max((sFork - sDogThrow) * cForkStop + der(sFork) * dForkStop, 0)
              else
                  if sFork < -sDogThrow then min((sFork + sDogThrow) * cForkStop + der(sFork) * dForkStop, 0)
              else
                  0);
   else
+      // No significant forces acting on the fork
       fForkDrive = 0;
       fFork = 0;
   end if;
 
+  // Fork force and position
   fork.f = fFork - fForkDrive;
   fork.s = sFork;
 
